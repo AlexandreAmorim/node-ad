@@ -1,0 +1,18 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Setting {
+  id           Int       @id @default(autoincrement())
+  sipol_status Boolean?  @default(true)
+  sipol_token  String?
+  created_at   DateTime? @default(now())
+  updated_at   DateTime? @default(now())
+
+  @@map("settings")
+}
