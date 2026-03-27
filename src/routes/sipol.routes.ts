@@ -31,7 +31,7 @@ export async function sipolRoutes(app: FastifyInstance) {
         document,
         name,
         mather,
-        birthday,});
+        birthday});
 
         return reply.status(200).send({
           success: true,

@@ -20,7 +20,7 @@ export class ActiveDirectoryService {
    * Autentica um usuário no AD
    */
   static async authenticate(username: string, password: string): Promise<boolean> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       // Adiciona o domínio se não estiver presente
       const fullUsername = username.includes('@') ? username : `${username}@${env.AD_BASE_DN.replace(/DC=/g, '').replace(/,/g, '.')}`;
 
@@ -44,7 +44,7 @@ export class ActiveDirectoryService {
       
       ad.findUser(sAMAccountName, (err, user) => {
         if (err) {
-          reject(new Error(`Erro ao buscar usuário: ${err.message}`));
+          reject(new Error(`Erro ao buscar usuário: ${(err as Error).message}`));
         } else if (!user) {
           reject(new Error('Usuário não encontrado'));
         } else {
@@ -141,11 +141,11 @@ export class ActiveDirectoryService {
         // Busca o DN do usuário alvo
         const searchOptions = {
           filter: `(sAMAccountName=${targetUsername})`,
-          scope: 'sub',
+          scope: 'sub' as const,
           attributes: ['dn']
         };
 
-        client.search(env.AD_BASE_DN, searchOptions, (searchErr, res) => {
+        client.search(env.AD_BASE_DN, searchOptions, (searchErr: Error | null, res: any) => {
           if (searchErr) {
             client.unbind();
             reject(new Error(`Erro na busca: ${searchErr.message}`));
@@ -154,7 +154,7 @@ export class ActiveDirectoryService {
 
           let userDN: string | null = null;
 
-          res.on('searchEntry', (entry) => {
+          res.on('searchEntry', (entry: any) => {
             userDN = entry.objectName;
           });
 
