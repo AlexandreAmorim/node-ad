@@ -91,8 +91,8 @@ export default class GatewaySipolPerson {
 			}
 
 			return false;
-		} catch (error) {
-			this.setError(error);
+		} catch (error: any) {
+			this.setError('error', error);
 
 			return false;
 		}
@@ -115,6 +115,7 @@ export default class GatewaySipolPerson {
 			return buffer;
 		} catch(err) {
 			console.log(err)
+			return null;
 		}
 	}
 
@@ -179,12 +180,13 @@ export default class GatewaySipolPerson {
         }
         const foto =  await this.handleImage(data)
         const dataConp = {...data, foto }
-       
+
         return dataConp;
       }
 
-    } catch (error) {
-      this.setError('', error);
+      return false;
+    } catch (error: any) {
+      this.setError('error', error);
 
       if (error.response && error.response.status === 404) {
         const filter = 'os dados informados.';

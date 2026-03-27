@@ -32,7 +32,7 @@ export async function detranRoutes(app: FastifyInstance) {
         document,
         name,
         mather,
-        birthday,});
+        birthday});
 
         const parser = new XMLParser();
         const dataaa = await parser.parse(detran.data, {});

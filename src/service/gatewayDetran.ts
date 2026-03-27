@@ -26,7 +26,7 @@ export default class GatewayDetran {
 	}
 
   async setIdentification(payload: any) {
-    const IDCidadao = parseInt(Math.random() * 20000, 10);
+    const IDCidadao = Math.floor(Math.random() * 20000);
     try {
       const {
         document_secondary, name, birthday, mather, father, document,
@@ -104,10 +104,12 @@ export default class GatewayDetran {
           const person = await this.getIdentification({
             IDCidadao,
           });
-  
+
           return person;
         }
-    } catch (error) {
+
+        return false;
+    } catch (error: any) {
       this.setError('', error);
 
       if (error.response && error.response.status === 404) {
@@ -151,7 +153,7 @@ export default class GatewayDetran {
         });
 
       return response;
-    } catch (error) {
+    } catch (error: any) {
       this.setError('', error);
 
       if (error.response && error.response.status === 404) {

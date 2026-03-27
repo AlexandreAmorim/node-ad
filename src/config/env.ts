@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
+import { resolve } from 'path';
 
-dotenv.config();
+// Carrega o .env da raiz do projeto, independente de onde o script é executado
+dotenv.config({ path: resolve(process.cwd(), '.env') });
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production']).default('development'),
@@ -30,6 +32,7 @@ const envSchema = z.object({
   
   // Optional: LDAPS Configuration
   AD_TLS_REJECT_UNAUTHORIZED: z.string().default('true'),
+  TSC_COMPILE_ON_ERROR: z.string().default('false'),
 });
 
 export const env = envSchema.parse(process.env);

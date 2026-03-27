@@ -14,7 +14,10 @@ declare module 'fastify' {
     authenticate: any;
     requireAdmin: any;
   }
-  interface FastifyRequest {
+}
+
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
     user: any;
   }
 }
