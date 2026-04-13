@@ -98,7 +98,6 @@ export default class GatewaySipolPerson {
 		}
 	}
 
-
 	async handleImage(data: any) {
 		const {
 			prejudicadoId
@@ -127,6 +126,7 @@ export default class GatewaySipolPerson {
         document, document_secondary, name, mather, birthday,
       } = payload;
 
+
       if (document_secondary) {
         const uri = `/restricoes-liberdade/prejudicados`;
         const params = {
@@ -140,7 +140,25 @@ export default class GatewaySipolPerson {
         const { data ,status } = await this.api.get(uri, { params, validateStatus: () => true });
 
         if (status !== 200) {
-         return 202
+					if (document) {
+						console.log('document:', document);
+						const uri = `/restricoes-liberdade/prejudicados`;
+							const params = {
+								tipoPesquisa: "inicio",
+								idTipoDocumento: 2,
+								numeroDocumento: document,
+								pageSort: "prejudicado",
+								pageOrder: "ASC",
+						}
+					const { data ,status } = await this.api.get(uri, { params, validateStatus: () => true })
+					if (status !== 200) {
+							return 202
+						}
+						const foto =  await this.handleImage(data)
+						const dataConp = {...data, foto }
+						return dataConp;
+					}
+						return 202;
         }
 
         const foto =  await this.handleImage(data)
@@ -158,6 +176,26 @@ export default class GatewaySipolPerson {
         }
         const { data ,status } = await this.api.get(uri, { params, validateStatus: () => true })
         if (status !== 200) {
+					if (document_secondary) {
+						const uri = `/restricoes-liberdade/prejudicados`;
+						const params = {
+							tipoPesquisa: "inicio",
+							idTipoDocumento: 1,
+							numeroDocumento: document_secondary,
+							pageSort: "prejudicado",
+							pageOrder: "ASC",
+						}
+			
+						const { data ,status } = await this.api.get(uri, { params, validateStatus: () => true });
+
+						if (status !== 200) {
+								return 202;
+						}
+
+						const foto =  await this.handleImage(data)
+						const dataConp = {...data, foto }
+						return dataConp;
+					}
           return 202
         }
         const foto =  await this.handleImage(data)

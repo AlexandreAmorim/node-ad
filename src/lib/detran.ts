@@ -16,12 +16,10 @@ export class DetranService {
       researcher: document_user,
     })
 
-   
-
     const person = await detran.setIdentification({
       document, document_secondary, name, birthday, mather,
     });
-    console.log("person ", person)
+   
     return person
   }
 }
