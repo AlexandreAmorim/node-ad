@@ -139,6 +139,9 @@ export default class GatewaySipolPerson {
   
         const { data ,status } = await this.api.get(uri, { params, validateStatus: () => true });
 
+				console.log('data', data)
+				console.log('status', status)
+
         if (status !== 200) {
 					if (document) {
 						console.log('document:', document);

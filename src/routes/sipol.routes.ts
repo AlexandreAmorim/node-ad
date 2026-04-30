@@ -33,6 +33,8 @@ export async function sipolRoutes(app: FastifyInstance) {
         mather,
         birthday});
 
+        console.log(person)
+
         return reply.status(200).send({
           success: true,
           person
