@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Paleta institucional — portada do protótipo original */
+  --color-ink: #132b45;
+  --color-ink-soft: #3d5a78;
+  --color-paper: #f5f7f9;
+  --color-card: #ffffff;
+  --color-line: #dee5ec;
+  --color-muted: #5b6b7b;
+  --color-danger: #b3261e;
+  --color-warn: #c77800;
+  --color-ok: #2e7d32;
+  --color-nexus: #5b4b8a;
+  --color-on-ink: #b7c6d5;
+  --color-on-ink-soft: #8fa6bc;
+  --color-on-ink-warn: #ffd9a0;
+  --color-on-ink-nexus: #cbbdf0;
+
+  /* Tipografia */
+  --font-display: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Largura do contêiner do painel */
+  --spacing-shell: 73.75rem; /* 1180px */
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+  }
+
+  body {
+    @apply bg-paper font-body text-ink antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ink-soft;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

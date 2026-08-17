@@ -4,8 +4,11 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/worker/sei.worker.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "start:worker": "node dist/worker/sei.worker.js",
+    "seed": "tsx scripts/seeds.ts"
   },
   "dependencies": {
     "@fastify/cors": "^8.4.2",
@@ -20,6 +23,7 @@
     "fast-xml-parser": "^5.2.5",
     "fastify": "^4.25.2",
     "ldapjs": "^3.0.5",
+    "soap": "^1.10.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
