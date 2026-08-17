@@ -30,7 +30,7 @@ async function buildServer() {
 
   // Registra plugins
   await app.register(cors, {
-    origin: true,
+    origin: [env.CORS_ORIGIN],
     credentials: true
   });
 

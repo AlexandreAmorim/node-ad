@@ -42,6 +42,8 @@ const envSchema = z.object({
 
   JWT_SECRET: z.string(),
 
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+
   AD_TLS_REJECT_UNAUTHORIZED: z.string().default('true'),
   TSC_COMPILE_ON_ERROR: z.string().default('false'),
 
