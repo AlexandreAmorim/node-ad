@@ -52,7 +52,7 @@ async function buildServer() {
     } catch (err) {
       reply.status(401).send({ 
         success: false, 
-        message: 'Token inválido ou expirado' 
+        message: 'Token inválido ou expirado!' 
       });
     }
   });
