@@ -7,6 +7,7 @@ import { authRoutes } from './routes/auth.routes';
 import { sipolRoutes } from './routes/sipol.routes';
 import { env } from './config/env';
 import { detranRoutes } from './routes/detran.routes';
+import { seiRoutes } from './routes/sei.routes';
 
 // Extende tipos do Fastify
 declare module 'fastify' {
@@ -69,13 +70,18 @@ async function buildServer() {
 
   // Health check
   app.get('/health', async () => {
-    return { status: 'ok', timestamp: new Date().toISOString() };
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      seiMock: env.SEI_MOCK,
+    };
   });
 
   // Registra rotas
   await app.register(authRoutes);
   await app.register(sipolRoutes);
-  await app.register(detranRoutes)
+  await app.register(detranRoutes);
+  await app.register(seiRoutes);
 
   return app;
 }

@@ -16,3 +16,152 @@ model Setting {
 
   @@map("settings")
 }
+
+// -----------------------------------------------------------------------------
+// Processos em acompanhamento
+// -----------------------------------------------------------------------------
+
+model Processo {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  protocolo        String  @unique
+  protocoloDigitos String  @map("protocolo_digitos")
+  idProcedimento   String? @map("id_procedimento")
+
+  tipoProcedimentoId   String?   @map("tipo_procedimento_id")
+  tipoProcedimentoNome String?   @map("tipo_procedimento_nome")
+  especificacao        String?
+  dataAutuacao         DateTime? @map("data_autuacao") @db.Date
+  nivelAcessoGlobal    Int?      @map("nivel_acesso_global") @db.SmallInt
+  linkAcesso           String?   @map("link_acesso")
+
+  concluido            Boolean   @default(false)
+  unidadesAbertas      Json      @default("[]") @map("unidades_abertas") @db.JsonB
+  ultimoAndamentoId    String?   @map("ultimo_andamento_id")
+  ultimoAndamentoEm    DateTime? @map("ultimo_andamento_em") @db.Timestamptz(6)
+  ultimoAndamentoTexto String?   @map("ultimo_andamento_texto")
+
+  ativo             Boolean @default(true)
+  rotulo            String?
+  observacaoInterna String? @map("observacao_interna")
+
+  sincronizadoEm       DateTime? @map("sincronizado_em") @db.Timestamptz(6)
+  proximaSincronizacao DateTime  @default(now()) @map("proxima_sincronizacao") @db.Timestamptz(6)
+  falhasConsecutivas   Int       @default(0) @map("falhas_consecutivas")
+  ultimoErro           String?   @map("ultimo_erro")
+  ultimoErroTipo       String?   @map("ultimo_erro_tipo")
+
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  atualizadoEm DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz(6)
+
+  andamentos Andamento[]
+  eventos    Evento[]
+  syncLogs   SyncLog[]
+
+  @@index([protocoloDigitos], map: "processo_digitos_idx")
+  // Índice parcial da fila (WHERE ativo AND NOT concluido) precisa ir na migration SQL —
+  // o Prisma não expressa predicado WHERE em @@index.
+  @@index([proximaSincronizacao], map: "processo_fila_idx")
+  @@map("processo")
+}
+
+// -----------------------------------------------------------------------------
+// Histórico de andamentos
+// -----------------------------------------------------------------------------
+
+model Andamento {
+  id BigInt @id @default(autoincrement())
+
+  processoId String   @map("processo_id") @db.Uuid
+  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  idAndamento String   @map("id_andamento")
+  idTarefa    String?  @map("id_tarefa")
+  descricao   String
+  ocorridoEm  DateTime @map("ocorrido_em") @db.Timestamptz(6)
+
+  unidadeId    String? @map("unidade_id")
+  unidadeSigla String? @map("unidade_sigla")
+  unidadeNome  String? @map("unidade_nome")
+  usuarioSigla String? @map("usuario_sigla")
+  usuarioNome  String? @map("usuario_nome")
+  atributos    Json    @default("{}") @db.JsonB
+
+  registradoEm DateTime @default(now()) @map("registrado_em") @db.Timestamptz(6)
+
+  @@unique([processoId, idAndamento], map: "andamento_unico")
+  @@index([processoId, ocorridoEm(sort: Desc)], map: "andamento_timeline_idx")
+  @@map("andamento")
+}
+
+// -----------------------------------------------------------------------------
+// Eventos gerados pelo diff
+// -----------------------------------------------------------------------------
+
+enum EventoTipo {
+  novo_andamento
+  mudou_unidade
+  concluido
+  reaberto
+  erro_sincronizacao
+
+  @@map("evento_tipo")
+}
+
+model Evento {
+  id BigInt @id @default(autoincrement())
+
+  processoId String   @map("processo_id") @db.Uuid
+  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  tipo         EventoTipo
+  payload      Json       @default("{}") @db.JsonB
+  criadoEm     DateTime   @default(now()) @map("criado_em") @db.Timestamptz(6)
+  processadoEm DateTime?  @map("processado_em") @db.Timestamptz(6)
+
+  // Índice parcial (WHERE processado_em IS NULL) também fica na migration SQL.
+  @@index([criadoEm], map: "evento_pendente_idx")
+  @@map("evento")
+}
+
+// -----------------------------------------------------------------------------
+// Log de sincronização
+// -----------------------------------------------------------------------------
+
+model SyncLog {
+  id BigInt @id @default(autoincrement())
+
+  processoId String?   @map("processo_id") @db.Uuid
+  processo   Processo? @relation(fields: [processoId], references: [id], onDelete: SetNull)
+
+  iniciadoEm      DateTime @default(now()) @map("iniciado_em") @db.Timestamptz(6)
+  duracaoMs       Int?     @map("duracao_ms")
+  sucesso         Boolean
+  andamentosNovos Int      @default(0) @map("andamentos_novos")
+  erro            String?
+  erroTipo        String?  @map("erro_tipo")
+
+  @@index([processoId, iniciadoEm(sort: Desc)], map: "sync_log_processo_idx")
+  @@map("sync_log")
+}
+
+// -----------------------------------------------------------------------------
+// Cache de tabelas auxiliares do SEI
+// -----------------------------------------------------------------------------
+
+model SeiUnidade {
+  idUnidade    String   @id @map("id_unidade")
+  sigla        String
+  descricao    String?
+  atualizadoEm DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz(6)
+
+  @@map("sei_unidade")
+}
+
+model SeiTipoProcedimento {
+  idTipoProcedimento String   @id @map("id_tipo_procedimento")
+  nome               String
+  atualizadoEm       DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz(6)
+
+  @@map("sei_tipo_procedimento")
+}
