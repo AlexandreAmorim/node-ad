@@ -4,10 +4,10 @@ services:
   pg:
     image: kartoza/postgis
     ports:
-      - '5431:5432'
+      - '5432:5432'
     environment:
-      - POSTGRES_USER=docker
-      - POSTGRES_PASSWORD=docker
+      - POSTGRES_USER=apiuser
+      - POSTGRES_PASSWORD=Segov2021
       - POSTGRES_DB=apilocal
 
 
