@@ -123,7 +123,7 @@ export function TelaLogin() {
           Secretaria de Governo · Rio de Janeiro
         </div>
         <h1 className="mt-1 mb-6 font-display text-xl font-extrabold text-ink">
-          Painel de Gestão Correcional
+          Painel de Gestão
         </h1>
 
         <label className="mb-1 block text-xs font-semibold text-ink-soft" htmlFor="usuario">

@@ -35,7 +35,7 @@ function Painel() {
                 Secretaria de Governo · Rio de Janeiro
               </div>
               <h1 className="mt-[3px] font-display text-2xl font-extrabold text-white">
-                Painel de Gestão Correcional
+                Painel de Gestão
               </h1>
             </div>
             <div className="text-right">

@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
-const CHAVE_TOKEN = 'painel-corregedoria:token'
+const CHAVE_TOKEN = 'painel-gestao:token'
 
 /** Erro de API com status e detalhes de validação do Zod (formato do backend). */
 export class ApiError extends Error {
@@ -22,7 +22,7 @@ export class ApiError extends Error {
  * Disparado quando a API responde 401 — o token de 8h do AD expirou.
  * O AuthProvider escuta e derruba a sessão.
  */
-export const EVENTO_NAO_AUTORIZADO = 'painel-corregedoria:nao-autorizado'
+export const EVENTO_NAO_AUTORIZADO = 'painel-gestao:nao-autorizado'
 
 export const tokenStore = {
   ler: () => sessionStorage.getItem(CHAVE_TOKEN),
