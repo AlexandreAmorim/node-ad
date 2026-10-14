@@ -13,6 +13,8 @@ import {
   unidadesAbertasDe,
 } from '../service/seiRepository';
 import { sincronizarProcesso } from '../service/seiSync';
+import { bearerSecurity, processoIdParamsSchema } from '../openapi/components';
+import { zodToSchema } from '../openapi/zod-to-schema';
 
 const serializarProcesso = (p: Processo) => ({
   id: p.id,
@@ -68,9 +70,29 @@ function zodReply(reply: any, err: ZodError) {
 }
 
 export async function seiRoutes(app: FastifyInstance) {
+  const auth = [app.authenticate];
+
   app.get(
     '/processos',
-    { preHandler: [app.authenticate] },
+    {
+      preHandler: auth,
+      schema: {
+        tags: ['SEI'],
+        summary: 'Listar processos',
+        security: [...bearerSecurity],
+        querystring: zodToSchema(listarProcessosQuerySchema),
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              dados: { type: 'array', items: { $ref: 'Processo#' } },
+            },
+          },
+          400: { $ref: 'ErrorSei#' },
+          401: { $ref: 'ErrorAuth#' },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const q = listarProcessosQuerySchema.parse(request.query);
@@ -91,7 +113,38 @@ export async function seiRoutes(app: FastifyInstance) {
 
   app.post(
     '/processos',
-    { preHandler: [app.authenticate] },
+    {
+      preHandler: auth,
+      schema: {
+        tags: ['SEI'],
+        summary: 'Criar / acompanhar processo',
+        security: [...bearerSecurity],
+        body: zodToSchema(criarProcessoBodySchema),
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              dado: { $ref: 'Processo#' },
+            },
+          },
+          202: {
+            type: 'object',
+            properties: {
+              dado: { $ref: 'Processo#' },
+              aviso: {
+                type: 'object',
+                properties: {
+                  tipo: { type: 'string', nullable: true },
+                  mensagem: { type: 'string', nullable: true },
+                },
+              },
+            },
+          },
+          400: { $ref: 'ErrorSei#' },
+          401: { $ref: 'ErrorAuth#' },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const body = criarProcessoBodySchema.parse(request.body);
@@ -123,7 +176,25 @@ export async function seiRoutes(app: FastifyInstance) {
 
   app.get(
     '/processos/:id',
-    { preHandler: [app.authenticate] },
+    {
+      preHandler: auth,
+      schema: {
+        tags: ['SEI'],
+        summary: 'Obter processo por ID',
+        security: [...bearerSecurity],
+        params: processoIdParamsSchema,
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              dado: { $ref: 'Processo#' },
+            },
+          },
+          401: { $ref: 'ErrorAuth#' },
+          404: { $ref: 'ErrorNotFound#' },
+        },
+      },
+    },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const processo = await processosRepo.porId(id);
@@ -134,7 +205,37 @@ export async function seiRoutes(app: FastifyInstance) {
 
   app.get(
     '/processos/:id/andamentos',
-    { preHandler: [app.authenticate] },
+    {
+      preHandler: auth,
+      schema: {
+        tags: ['SEI'],
+        summary: 'Listar andamentos do processo',
+        security: [...bearerSecurity],
+        params: processoIdParamsSchema,
+        querystring: {
+          type: 'object',
+          properties: {
+            limite: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 500,
+              default: 200,
+              description: 'Limite de andamentos (máx. 500)',
+            },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              dados: { type: 'array', items: { $ref: 'Andamento#' } },
+            },
+          },
+          401: { $ref: 'ErrorAuth#' },
+          404: { $ref: 'ErrorNotFound#' },
+        },
+      },
+    },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const processo = await processosRepo.porId(id);
@@ -148,7 +249,25 @@ export async function seiRoutes(app: FastifyInstance) {
 
   app.get(
     '/processos/:id/eventos',
-    { preHandler: [app.authenticate] },
+    {
+      preHandler: auth,
+      schema: {
+        tags: ['SEI'],
+        summary: 'Listar eventos do processo',
+        security: [...bearerSecurity],
+        params: processoIdParamsSchema,
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              dados: { type: 'array', items: { $ref: 'Evento#' } },
+            },
+          },
+          401: { $ref: 'ErrorAuth#' },
+          404: { $ref: 'ErrorNotFound#' },
+        },
+      },
+    },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const processo = await processosRepo.porId(id);
@@ -160,7 +279,33 @@ export async function seiRoutes(app: FastifyInstance) {
 
   app.post(
     '/processos/:id/sincronizar',
-    { preHandler: [app.authenticate] },
+    {
+      preHandler: auth,
+      schema: {
+        tags: ['SEI'],
+        summary: 'Sincronizar processo com o SEI',
+        security: [...bearerSecurity],
+        params: processoIdParamsSchema,
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              dado: { $ref: 'Processo#' },
+              resultado: { type: 'object', additionalProperties: true },
+            },
+          },
+          401: { $ref: 'ErrorAuth#' },
+          404: { $ref: 'ErrorNotFound#' },
+          502: {
+            type: 'object',
+            properties: {
+              dado: { $ref: 'Processo#' },
+              resultado: { type: 'object', additionalProperties: true },
+            },
+          },
+        },
+      },
+    },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const processo = await processosRepo.porId(id);
@@ -178,7 +323,27 @@ export async function seiRoutes(app: FastifyInstance) {
 
   app.patch(
     '/processos/:id',
-    { preHandler: [app.authenticate] },
+    {
+      preHandler: auth,
+      schema: {
+        tags: ['SEI'],
+        summary: 'Atualizar processo (ativo / rótulo)',
+        security: [...bearerSecurity],
+        params: processoIdParamsSchema,
+        body: zodToSchema(patchProcessoBodySchema),
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              dado: { $ref: 'Processo#' },
+            },
+          },
+          400: { $ref: 'ErrorSei#' },
+          401: { $ref: 'ErrorAuth#' },
+          404: { $ref: 'ErrorNotFound#' },
+        },
+      },
+    },
     async (request, reply) => {
       try {
         const body = patchProcessoBodySchema.parse(request.body);
@@ -200,7 +365,20 @@ export async function seiRoutes(app: FastifyInstance) {
 
   app.delete(
     '/processos/:id',
-    { preHandler: [app.authenticate] },
+    {
+      preHandler: auth,
+      schema: {
+        tags: ['SEI'],
+        summary: 'Remover processo',
+        security: [...bearerSecurity],
+        params: processoIdParamsSchema,
+        response: {
+          204: { type: 'null', description: 'Removido com sucesso' },
+          401: { $ref: 'ErrorAuth#' },
+          404: { $ref: 'ErrorNotFound#' },
+        },
+      },
+    },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const removido = await processosRepo.remover(id);

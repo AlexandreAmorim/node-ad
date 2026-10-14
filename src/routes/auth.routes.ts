@@ -5,10 +5,30 @@ import {
   changePasswordSchema, 
   adminResetPasswordSchema 
 } from '../schemas/auth.schemas';
+import { bearerSecurity } from '../openapi/components';
+import { zodToSchema } from '../openapi/zod-to-schema';
 
 export async function authRoutes(app: FastifyInstance) {
 
-  app.post('/auth/login', async (request, reply) => {
+  app.post('/auth/login', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Login via Active Directory',
+      body: zodToSchema(loginSchema),
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            token: { type: 'string' },
+            user: { $ref: 'AuthUser#' },
+          },
+        },
+        400: { $ref: 'ErrorAuth#' },
+        401: { $ref: 'ErrorAuth#' },
+      },
+    },
+  }, async (request, reply) => {
     try {
       const { username, password } = loginSchema.parse(request.body);
       const isAuthenticated = await ActiveDirectoryService.authenticate(username, password);
@@ -53,7 +73,24 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   // Change password endpoint (usuário troca própria senha)
-  app.post('/auth/change-password', async (request, reply) => {
+  app.post('/auth/change-password', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Trocar senha do próprio usuário',
+      body: zodToSchema(changePasswordSchema),
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+          },
+        },
+        400: { $ref: 'ErrorAuth#' },
+        401: { $ref: 'ErrorAuth#' },
+      },
+    },
+  }, async (request, reply) => {
     try {
       const { username, oldPassword, newPassword } = changePasswordSchema.parse(request.body);
       
@@ -84,7 +121,25 @@ export async function authRoutes(app: FastifyInstance) {
 
   // Admin reset password endpoint (requer autenticação JWT e privilégios admin)
   app.post('/admin/reset-password', {
-    preHandler: [app.authenticate, app.requireAdmin]
+    preHandler: [app.authenticate, app.requireAdmin],
+    schema: {
+      tags: ['Auth'],
+      summary: 'Reset de senha (admin)',
+      security: [...bearerSecurity],
+      body: zodToSchema(adminResetPasswordSchema),
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+          },
+        },
+        400: { $ref: 'ErrorAuth#' },
+        401: { $ref: 'ErrorAuth#' },
+        403: { $ref: 'ErrorAuth#' },
+      },
+    },
   }, async (request, reply) => {
     try {
       const { targetUsername, newPassword } = adminResetPasswordSchema.parse(request.body);
@@ -105,7 +160,30 @@ export async function authRoutes(app: FastifyInstance) {
 
   // Get user info endpoint
   app.get('/auth/user/:username', {
-    preHandler: [app.authenticate]
+    preHandler: [app.authenticate],
+    schema: {
+      tags: ['Auth'],
+      summary: 'Obter informações de um usuário do AD',
+      security: [...bearerSecurity],
+      params: {
+        type: 'object',
+        properties: {
+          username: { type: 'string' },
+        },
+        required: ['username'],
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            user: { $ref: 'AuthUserDetail#' },
+          },
+        },
+        401: { $ref: 'ErrorAuth#' },
+        404: { $ref: 'ErrorAuth#' },
+      },
+    },
   }, async (request, reply) => {
     try {
       const { username } = request.params as { username: string };

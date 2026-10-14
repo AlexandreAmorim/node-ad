@@ -8,6 +8,7 @@ import { sipolRoutes } from './routes/sipol.routes';
 import { env } from './config/env';
 import { detranRoutes } from './routes/detran.routes';
 import { seiRoutes } from './routes/sei.routes';
+import { registerSwagger } from './plugins/swagger';
 
 // Extende tipos do Fastify
 declare module 'fastify' {
@@ -25,7 +26,13 @@ declare module '@fastify/jwt' {
 
 async function buildServer() {
   const app = Fastify({
-    logger: env.NODE_ENV === 'development'
+    logger: env.NODE_ENV === 'development',
+    // Coerce query/body types (ex.: limite/offset) para alinhar JSON Schema com Zod
+    ajv: {
+      customOptions: {
+        coerceTypes: true,
+      },
+    },
   });
 
   // Registra plugins
@@ -34,7 +41,10 @@ async function buildServer() {
     credentials: true
   });
 
-  await app.register(helmet);
+  // CSP relaxado para a UI do Swagger em /docs
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+  });
 
   await app.register(rateLimit, {
     max: 100,
@@ -44,6 +54,8 @@ async function buildServer() {
   await app.register(jwt, {
     secret: env.JWT_SECRET
   });
+
+  await registerSwagger(app);
 
   // Decorators para autenticação
   app.decorate('authenticate', async (request: any, reply: any) => {
@@ -69,7 +81,23 @@ async function buildServer() {
   });
 
   // Health check
-  app.get('/health', async () => {
+  app.get('/health', {
+    schema: {
+      tags: ['Health'],
+      summary: 'Health check',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', example: 'ok' },
+            timestamp: { type: 'string', format: 'date-time' },
+            seiMock: { type: 'boolean' },
+          },
+          required: ['status', 'timestamp', 'seiMock'],
+        },
+      },
+    },
+  }, async () => {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
@@ -97,6 +125,7 @@ async function start() {
     });
 
     console.log(`🚀 Server running on port ${env.PORT}`);
+    console.log(`📚 Swagger UI: http://localhost:${env.PORT}/docs`);
   } catch (err) {
     console.error('Error starting server:', err);
     process.exit(1);

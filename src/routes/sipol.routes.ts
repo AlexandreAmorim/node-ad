@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { SipolService } from '../lib/sipol';
 import { z } from 'zod'
+import { zodToSchema } from '../openapi/zod-to-schema';
 
 const sipolPersonBodySchema = z.object({
   document_user: z.string(),
@@ -14,7 +15,31 @@ const sipolPersonBodySchema = z.object({
 type SipolPersonBodySchema = z.infer<typeof sipolPersonBodySchema>
  
 export async function sipolRoutes(app: FastifyInstance) {
- app.post('/sipol/person', async (request, reply) => {
+ app.post('/sipol/person', {
+    schema: {
+      tags: ['Sipol'],
+      summary: 'Consultar pessoa no Sipol',
+      body: zodToSchema(sipolPersonBodySchema),
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            person: {},
+          },
+        },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, async (request, reply) => {
+
+  console.log('request', request.body)
 
     try {
       const { 
