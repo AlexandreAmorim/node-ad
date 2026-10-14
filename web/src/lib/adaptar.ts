@@ -37,6 +37,8 @@ const data = (iso: string | null | undefined): Date | null =>
   iso ? new Date(iso) : null
 
 export function adaptarProcesso(p: ApiProcesso): ProcessoPainel {
+
+  console.log("p", p)
   const prazoFim = p.prazoFim ?? null
   const prescricao = p.prescricaoEm ?? null
 
