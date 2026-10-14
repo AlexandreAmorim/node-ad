@@ -2,7 +2,9 @@ import { z } from 'zod';
 import dotenv from 'dotenv';
 import { resolve } from 'path';
 
-dotenv.config({ path: resolve(process.cwd(), '.env') });
+dotenv.config({ path: resolve(__dirname, '../../.env') });
+// ou, se preferir relativo à pasta do projeto a partir de dist/config:
+// resolve(__dirname, '..', '..', '.env')  → node-ad/.env
 
 const bool = z
   .string()
