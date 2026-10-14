@@ -1,17 +1,23 @@
+import axios from 'axios';
+import { XMLParser } from 'fast-xml-parser';
 import * as soap from 'soap';
 import { env } from '../../config/env';
 import { toSeiError, SeiError } from './errors';
+import { arr, buildEnvelope, struct, type SeiParam } from './encoder';
 import { toArray } from './normalize';
 import type {
   Andamento,
   ConsultarDocumentoParams,
   ConsultarProcedimentoParams,
+  GerarProcedimentoDados,
   ListarAndamentosParams,
   ListarTiposProcedimentoParams,
   ListarUnidadesParams,
   ParamsBase,
+  RetornoConsultaBloco,
   RetornoConsultaDocumento,
   RetornoConsultaProcedimento,
+  RetornoGeracaoProcedimento,
   SeiClient,
   TipoProcedimento,
   Unidade,
@@ -23,6 +29,11 @@ type SoapClientLike = Record<string, (...args: unknown[]) => unknown> & {
 
 export class SeiSoapClient implements SeiClient {
   #clientPromise: Promise<SoapClientLike> | null = null;
+  #parser = new XMLParser({
+    ignoreAttributes: true,
+    transformTagName: (tag) => tag.replace(/^.*:/, ''),
+    parseTagValue: false,
+  });
 
   readonly #base: ParamsBase;
 
@@ -32,6 +43,17 @@ export class SeiSoapClient implements SeiClient {
       IdentificacaoServico: base?.IdentificacaoServico ?? env.SEI_CHAVE_ACESSO,
       IdUnidade: base?.IdUnidade ?? env.SEI_ID_UNIDADE,
     };
+  }
+
+  #unidade(override?: string): string {
+    return override || this.#base.IdUnidade;
+  }
+
+  #authParams(): SeiParam[] {
+    return [
+      ['SiglaSistema', this.#base.SiglaSistema],
+      ['IdentificacaoServico', this.#base.IdentificacaoServico],
+    ];
   }
 
   async #client(): Promise<SoapClientLike> {
@@ -83,6 +105,52 @@ export class SeiSoapClient implements SeiClient {
         : envelope;
 
     return payload as T;
+  }
+
+  /**
+   * Chamada rpc/encoded com encoder próprio — necessária para arrays/structs
+   * (gerarProcedimento, enviarProcesso, blocos).
+   */
+  async #rpcCall<T>(operation: string, params: SeiParam[]): Promise<T> {
+    const envelope = buildEnvelope(operation, params);
+    const endpoint = env.SEI_ENDPOINT || env.SEI_WSDL_URL;
+
+    try {
+      const { data, status } = await axios.post(endpoint, envelope, {
+        headers: {
+          'Content-Type': `text/xml; charset=${env.SEI_ENCODING}`,
+          SOAPAction: 'SeiAction',
+        },
+        timeout: env.SEI_TIMEOUT_MS,
+        validateStatus: () => true,
+        responseType: 'text',
+        transformResponse: [(d) => d],
+      });
+
+      const parsed = this.#parser.parse(data);
+      const body = parsed?.Envelope?.Body;
+
+      if (body?.Fault) {
+        throw new SeiError(
+          operation,
+          body.Fault.faultstring ?? 'Falha não identificada no SeiWS',
+          'desconhecido',
+        );
+      }
+
+      if (status >= 500 && !body) {
+        throw new SeiError(operation, `HTTP ${status} sem Fault SOAP`, 'indisponivel');
+      }
+
+      const response = body?.[`${operation}Response`];
+      if (response === undefined) {
+        throw new SeiError(operation, `Resposta inesperada em ${operation}`, 'desconhecido');
+      }
+
+      return (response.parametros ?? response) as T;
+    } catch (err) {
+      throw toSeiError(operation, err);
+    }
   }
 
   #args(extra: Record<string, unknown>, override?: Partial<ParamsBase>): Record<string, unknown> {
@@ -162,6 +230,26 @@ export class SeiSoapClient implements SeiClient {
     }));
   }
 
+  async listarAndamentosLivres(
+    protocolo: string,
+    opts: { idUnidade?: string; comAtributos?: boolean } = {},
+  ): Promise<Andamento[]> {
+    const r = await this.#rpcCall<{ item?: Andamento | Andamento[] }>('listarAndamentos', [
+      ...this.#authParams(),
+      ['IdUnidade', this.#unidade(opts.idUnidade)],
+      ['ProtocoloProcedimento', protocolo],
+      ['SinRetornarAtributos', opts.comAtributos ? 'S' : 'N'],
+      ['Andamentos', ''],
+      ['Tarefas', ''],
+      ['TarefasModulos', ''],
+    ]);
+
+    return toArray<Andamento>(r?.item ?? r).map((a) => ({
+      ...a,
+      Atributos: toArray(a.Atributos),
+    }));
+  }
+
   async consultarDocumento(
     params: Omit<ConsultarDocumentoParams, keyof ParamsBase> & Partial<ParamsBase>,
   ): Promise<RetornoConsultaDocumento> {
@@ -198,8 +286,141 @@ export class SeiSoapClient implements SeiClient {
   ): Promise<TipoProcedimento[]> {
     const bruto = await this.#call<unknown>(
       'listarTiposProcedimento',
-      this.#args({ IdSerie: params.IdSerie, SinIndividual: params.SinIndividual }),
+      this.#args({
+        IdUnidade: params.IdUnidade,
+        IdSerie: params.IdSerie,
+        SinIndividual: params.SinIndividual,
+      }),
     );
     return toArray<TipoProcedimento>(bruto);
+  }
+
+  async consultarBloco(idBloco: string, idUnidade?: string): Promise<RetornoConsultaBloco> {
+    const r = await this.#rpcCall<Record<string, unknown>>('consultarBloco', [
+      ...this.#authParams(),
+      ['IdUnidade', this.#unidade(idUnidade)],
+      ['IdBloco', idBloco],
+      ['SinRetornarProtocolos', 'S'],
+    ]);
+
+    return {
+      Descricao: String(r.Descricao ?? ''),
+      Estado: String(r.Estado ?? ''),
+      Protocolos: toArray<{ ProtocoloFormatado: string; Identificacao?: string }>(
+        (r as { Protocolos?: unknown }).Protocolos,
+      ),
+    };
+  }
+
+  async incluirProcessoBloco(
+    idBloco: string,
+    protocolo: string,
+    opts: { idUnidade?: string; anotacao?: string } = {},
+  ): Promise<void> {
+    await this.#rpcCall('incluirProcessoBloco', [
+      ...this.#authParams(),
+      ['IdUnidade', this.#unidade(opts.idUnidade)],
+      ['IdBloco', idBloco],
+      ['ProtocoloProcedimento', protocolo],
+      ['Anotacao', opts.anotacao ?? ''],
+    ]);
+  }
+
+  async gerarProcedimento(
+    dados: GerarProcedimentoDados,
+    opts: {
+      idUnidade?: string;
+      unidadesEnvio?: string[];
+      manterAbertoNaOrigem?: boolean;
+    } = {},
+  ): Promise<RetornoGeracaoProcedimento> {
+    const unidadesEnvio = opts.unidadesEnvio ?? [];
+    const manterAberto = opts.manterAbertoNaOrigem ?? true;
+
+    const procedimento = struct('Procedimento', [
+      ['IdTipoProcedimento', dados.idTipoProcedimento],
+      ['NumeroProtocolo', ''],
+      ['DataAutuacao', ''],
+      ['Especificacao', dados.especificacao],
+      [
+        'Assuntos',
+        dados.assuntos?.length
+          ? arr(
+              'ArrayOfAssunto',
+              'sei:Assunto',
+              dados.assuntos.map((a) =>
+                struct('Assunto', [
+                  ['CodigoEstruturado', a.codigoEstruturado],
+                  ['Descricao', a.descricao ?? ''],
+                ]),
+              ),
+            )
+          : null,
+      ],
+      [
+        'Interessados',
+        dados.interessados?.length
+          ? arr(
+              'ArrayOfInteressado',
+              'sei:Interessado',
+              dados.interessados.map((i) =>
+                struct('Interessado', [
+                  ['IdContato', ''],
+                  ['Cpf', i.cpf ?? ''],
+                  ['Cnpj', ''],
+                  ['Sigla', i.sigla ?? ''],
+                  ['Nome', i.nome],
+                ]),
+              ),
+            )
+          : null,
+      ],
+      ['Observacao', dados.observacao ?? ''],
+      ['NivelAcesso', dados.nivelAcesso ?? '0'],
+      ['IdHipoteseLegal', dados.idHipoteseLegal ?? ''],
+      ['IdTipoPrioridade', ''],
+    ]);
+
+    return this.#rpcCall<RetornoGeracaoProcedimento>('gerarProcedimento', [
+      ...this.#authParams(),
+      ['IdUnidade', this.#unidade(opts.idUnidade)],
+      ['Procedimento', procedimento],
+      ['Documentos', null],
+      ['ProcedimentosRelacionados', null],
+      [
+        'UnidadesEnvio',
+        unidadesEnvio.length ? arr('ArrayOfIdUnidade', 'xsd:string', unidadesEnvio) : null,
+      ],
+      ['SinManterAbertoUnidade', manterAberto ? 'S' : 'N'],
+      ['SinEnviarEmailNotificacao', 'N'],
+      ['DataRetornoProgramado', ''],
+      ['DiasRetornoProgramado', ''],
+      ['SinDiasUteisRetornoProgramado', ''],
+      ['IdMarcador', ''],
+      ['TextoMarcador', ''],
+      ['DataControlePrazo', ''],
+      ['DiasControlePrazo', ''],
+      ['SinDiasUteisControlePrazo', ''],
+    ]);
+  }
+
+  async enviarProcesso(
+    protocolo: string,
+    unidadesDestino: string[],
+    opts: { idUnidadeOrigem?: string; manterAbertoNaOrigem?: boolean } = {},
+  ): Promise<void> {
+    await this.#rpcCall('enviarProcesso', [
+      ...this.#authParams(),
+      ['IdUnidade', this.#unidade(opts.idUnidadeOrigem)],
+      ['ProtocoloProcedimento', protocolo],
+      ['UnidadesDestino', arr('ArrayOfIdUnidade', 'xsd:string', unidadesDestino)],
+      ['SinManterAbertoUnidade', opts.manterAbertoNaOrigem ? 'S' : 'N'],
+      ['SinRemoverAnotacao', 'N'],
+      ['SinEnviarEmailNotificacao', 'N'],
+      ['DataRetornoProgramado', ''],
+      ['DiasRetornoProgramado', ''],
+      ['SinDiasUteisRetornoProgramado', ''],
+      ['SinReabrir', 'S'],
+    ]);
   }
 }

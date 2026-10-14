@@ -51,6 +51,11 @@ const envSchema = z.object({
 
   // SEI
   SEI_WSDL_URL: z.string().url().default('https://sei.rj.gov.br/sei/controlador_ws.php?servico=sei'),
+  /** Endpoint SOAP direto (rpc/encoded). Se vazio, usa SEI_WSDL_URL. */
+  SEI_ENDPOINT: z.preprocess(
+    (v) => (v === '' || v === undefined || v === null ? undefined : v),
+    z.string().url().optional(),
+  ),
   SEI_SIGLA_SISTEMA: z.string().min(1).default('ACOMPANHAMENTO'),
   SEI_CHAVE_ACESSO: z.string().min(1).default('mock'),
   SEI_ID_UNIDADE: z.string().min(1).default('000000000'),
@@ -58,6 +63,10 @@ const envSchema = z.object({
   SEI_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   SEI_TAREFAS_ANDAMENTO: csv,
   SEI_MOCK: bool,
+  /** Chamadas simultâneas ao SeiWS (gerar/blocos/hidratação). */
+  SEI_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(4),
+  /** TTL do cache de unidades/tipos (ms). */
+  SEI_CACHE_TTL_MS: z.coerce.number().int().nonnegative().default(15 * 60_000),
 
   WORKER_TICK_MS: z.coerce.number().int().positive().default(60_000),
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(3),

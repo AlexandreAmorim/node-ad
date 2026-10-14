@@ -34,7 +34,12 @@ export async function registerSwagger(app: FastifyInstance) {
       tags: [
         { name: 'Health', description: 'Health check' },
         { name: 'Auth', description: 'Autenticação e gestão de senhas (AD)' },
-        { name: 'SEI', description: 'Processos SEI' },
+        { name: 'SEI', description: 'Acompanhamento de processos SEI (persistido)' },
+        {
+          name: 'SEI Gateway',
+          description:
+            'Gateway live sobre o SeiWS (unidades, blocos, gerar/enviar) — alinhado ao segov/sei',
+        },
         { name: 'Detran', description: 'Consulta Detran' },
         { name: 'Sipol', description: 'Consulta Sipol' },
       ],

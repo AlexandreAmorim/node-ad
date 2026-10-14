@@ -1,10 +1,13 @@
 import type {
   Andamento,
   ConsultarProcedimentoParams,
+  GerarProcedimentoDados,
   ListarAndamentosParams,
   ParamsBase,
+  RetornoConsultaBloco,
   RetornoConsultaDocumento,
   RetornoConsultaProcedimento,
+  RetornoGeracaoProcedimento,
   SeiClient,
   TipoProcedimento,
   Unidade,
@@ -43,6 +46,14 @@ interface EstadoMock {
   autuacao: Date;
   passo: number;
   andamentos: Andamento[];
+  unidadeAberta: Unidade;
+}
+
+interface BlocoMock {
+  id: string;
+  descricao: string;
+  estado: string;
+  protocolos: string[];
 }
 
 function dataHoraSei(d: Date): string {
@@ -50,8 +61,15 @@ function dataHoraSei(d: Date): string {
   return `${formatDataSei(d)} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+function protocoloMock(seq: number): string {
+  const n = String(seq).padStart(6, '0');
+  return `070001.${n}/2026-45`;
+}
+
 export class SeiMockClient implements SeiClient {
   #estados = new Map<string, EstadoMock>();
+  #blocos = new Map<string, BlocoMock>();
+  #seqGerado = 0;
 
   readonly avancoPorConsulta: number;
   readonly protocolosInexistentes: Set<string>;
@@ -59,6 +77,13 @@ export class SeiMockClient implements SeiClient {
   constructor(opts: { avancoPorConsulta?: number; protocolosInexistentes?: string[] } = {}) {
     this.avancoPorConsulta = opts.avancoPorConsulta ?? 1;
     this.protocolosInexistentes = new Set(opts.protocolosInexistentes ?? ['00.0.000000000-0']);
+
+    this.#blocos.set('1001', {
+      id: '1001',
+      descricao: 'Bloco de acompanhamento (mock)',
+      estado: 'Aberto',
+      protocolos: [],
+    });
   }
 
   #estado(protocolo: string): EstadoMock {
@@ -82,6 +107,7 @@ export class SeiMockClient implements SeiClient {
         autuacao,
         passo: 0,
         andamentos: [],
+        unidadeAberta: UNIDADES[0]!,
       };
       this.#estados.set(protocolo, estado);
       this.#avancar(estado, 3);
@@ -103,6 +129,7 @@ export class SeiMockClient implements SeiClient {
         Usuario: USUARIO,
         Atributos: [],
       });
+      estado.unidadeAberta = UNIDADES[item.unidade]!;
       estado.passo += 1;
     }
   }
@@ -139,7 +166,7 @@ export class SeiMockClient implements SeiClient {
         params.SinRetornarUnidadesProcedimentoAberto === 'S'
           ? concluido
             ? []
-            : [{ Unidade: ultimo.Unidade, UsuarioAtribuicao: USUARIO }]
+            : [{ Unidade: estado.unidadeAberta, UsuarioAtribuicao: USUARIO }]
           : [],
       Assuntos:
         params.SinRetornarAssuntos === 'S'
@@ -180,6 +207,13 @@ export class SeiMockClient implements SeiClient {
     });
   }
 
+  async listarAndamentosLivres(
+    protocolo: string,
+    _opts?: { idUnidade?: string; comAtributos?: boolean },
+  ): Promise<Andamento[]> {
+    return this.#estado(protocolo).andamentos;
+  }
+
   async consultarDocumento(): Promise<RetornoConsultaDocumento> {
     throw new SeiError('consultarDocumento', 'Não implementado no mock.', 'desconhecido');
   }
@@ -190,5 +224,103 @@ export class SeiMockClient implements SeiClient {
 
   async listarTiposProcedimento(): Promise<TipoProcedimento[]> {
     return TIPOS;
+  }
+
+  async consultarBloco(idBloco: string): Promise<RetornoConsultaBloco> {
+    const bloco = this.#blocos.get(idBloco);
+    if (!bloco) {
+      throw new SeiError('consultarBloco', `Bloco ${idBloco} não encontrado.`, 'nao_encontrado');
+    }
+    return {
+      Descricao: bloco.descricao,
+      Estado: bloco.estado,
+      Protocolos: bloco.protocolos.map((p) => ({ ProtocoloFormatado: p })),
+    };
+  }
+
+  async incluirProcessoBloco(
+    idBloco: string,
+    protocolo: string,
+    _opts?: { idUnidade?: string; anotacao?: string },
+  ): Promise<void> {
+    let bloco = this.#blocos.get(idBloco);
+    if (!bloco) {
+      bloco = {
+        id: idBloco,
+        descricao: `Bloco ${idBloco}`,
+        estado: 'Aberto',
+        protocolos: [],
+      };
+      this.#blocos.set(idBloco, bloco);
+    }
+    this.#estado(protocolo);
+    if (!bloco.protocolos.includes(protocolo)) {
+      bloco.protocolos.push(protocolo);
+    }
+  }
+
+  async gerarProcedimento(
+    dados: GerarProcedimentoDados,
+    opts: {
+      idUnidade?: string;
+      unidadesEnvio?: string[];
+      manterAbertoNaOrigem?: boolean;
+    } = {},
+  ): Promise<RetornoGeracaoProcedimento> {
+    this.#seqGerado += 1;
+    const protocolo = protocoloMock(this.#seqGerado);
+    const tipo =
+      TIPOS.find((t) => t.IdTipoProcedimento === dados.idTipoProcedimento) ?? TIPOS[0]!;
+    const unidadeOrigem =
+      UNIDADES.find((u) => u.IdUnidade === opts.idUnidade) ?? UNIDADES[0]!;
+
+    const estado: EstadoMock = {
+      protocolo,
+      idProcedimento: `12109000${String(this.#seqGerado).padStart(5, '0')}`,
+      tipo,
+      especificacao: dados.especificacao,
+      autuacao: new Date(),
+      passo: 0,
+      andamentos: [],
+      unidadeAberta: unidadeOrigem,
+    };
+    this.#estados.set(protocolo, estado);
+    this.#avancar(estado, 1);
+
+    if (opts.unidadesEnvio?.length) {
+      const dest =
+        UNIDADES.find((u) => u.IdUnidade === opts.unidadesEnvio![0]) ?? UNIDADES[1]!;
+      if (!opts.manterAbertoNaOrigem) {
+        estado.unidadeAberta = dest;
+      }
+    }
+
+    return {
+      IdProcedimento: estado.idProcedimento,
+      ProcedimentoFormatado: protocolo,
+      LinkAcesso: `https://sei.exemplo.rj.gov.br/sei/processo/${estado.idProcedimento}`,
+    };
+  }
+
+  async enviarProcesso(
+    protocolo: string,
+    unidadesDestino: string[],
+    opts: { idUnidadeOrigem?: string; manterAbertoNaOrigem?: boolean } = {},
+  ): Promise<void> {
+    const estado = this.#estado(protocolo);
+    const dest =
+      UNIDADES.find((u) => u.IdUnidade === unidadesDestino[0]) ?? UNIDADES[1]!;
+    estado.andamentos.push({
+      IdAndamento: `${estado.idProcedimento}-ENV`,
+      IdTarefa: '5',
+      Descricao: `Processo remetido para ${dest.Sigla}`,
+      DataHora: dataHoraSei(new Date()),
+      Unidade: estado.unidadeAberta,
+      Usuario: USUARIO,
+      Atributos: [],
+    });
+    if (!opts.manterAbertoNaOrigem) {
+      estado.unidadeAberta = dest;
+    }
   }
 }

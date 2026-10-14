@@ -8,6 +8,7 @@ import { sipolRoutes } from './routes/sipol.routes';
 import { env } from './config/env';
 import { detranRoutes } from './routes/detran.routes';
 import { seiRoutes } from './routes/sei.routes';
+import { seiGatewayRoutes } from './routes/sei.gateway.routes';
 import { registerSwagger } from './plugins/swagger';
 
 // Extende tipos do Fastify
@@ -110,6 +111,7 @@ async function buildServer() {
   await app.register(sipolRoutes);
   await app.register(detranRoutes);
   await app.register(seiRoutes);
+  await app.register(seiGatewayRoutes);
 
   return app;
 }

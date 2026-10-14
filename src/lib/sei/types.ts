@@ -176,6 +176,34 @@ export interface ListarTiposProcedimentoParams {
   SinIndividual?: SinNao;
 }
 
+export interface ProtocoloBloco {
+  ProtocoloFormatado: string;
+  Identificacao?: string;
+}
+
+export interface RetornoConsultaBloco {
+  Descricao: string;
+  Estado: string;
+  Protocolos: ProtocoloBloco[];
+}
+
+export interface GerarProcedimentoDados {
+  idTipoProcedimento: string;
+  especificacao: string;
+  /** 0 = público, 1 = restrito, 2 = sigiloso */
+  nivelAcesso?: NivelAcesso;
+  idHipoteseLegal?: string;
+  observacao?: string;
+  interessados?: Array<{ nome: string; sigla?: string; cpf?: string }>;
+  assuntos?: Array<{ codigoEstruturado: string; descricao?: string }>;
+}
+
+export interface RetornoGeracaoProcedimento {
+  IdProcedimento: string;
+  ProcedimentoFormatado: string;
+  LinkAcesso?: string;
+}
+
 export interface SeiClient {
   consultarProcedimento(
     params: Omit<ConsultarProcedimentoParams, keyof ParamsBase> & Partial<ParamsBase>,
@@ -183,6 +211,12 @@ export interface SeiClient {
 
   listarAndamentos(
     params: Omit<ListarAndamentosParams, keyof ParamsBase> & Partial<ParamsBase>,
+  ): Promise<Andamento[]>;
+
+  /** Listagem sem filtro de tarefa (comportamento do gateway sei). */
+  listarAndamentosLivres(
+    protocolo: string,
+    opts?: { idUnidade?: string; comAtributos?: boolean },
   ): Promise<Andamento[]>;
 
   consultarDocumento(
@@ -194,4 +228,27 @@ export interface SeiClient {
   listarTiposProcedimento(
     params?: Partial<ListarTiposProcedimentoParams>,
   ): Promise<TipoProcedimento[]>;
+
+  consultarBloco(idBloco: string, idUnidade?: string): Promise<RetornoConsultaBloco>;
+
+  incluirProcessoBloco(
+    idBloco: string,
+    protocolo: string,
+    opts?: { idUnidade?: string; anotacao?: string },
+  ): Promise<void>;
+
+  gerarProcedimento(
+    dados: GerarProcedimentoDados,
+    opts?: {
+      idUnidade?: string;
+      unidadesEnvio?: string[];
+      manterAbertoNaOrigem?: boolean;
+    },
+  ): Promise<RetornoGeracaoProcedimento>;
+
+  enviarProcesso(
+    protocolo: string,
+    unidadesDestino: string[],
+    opts?: { idUnidadeOrigem?: string; manterAbertoNaOrigem?: boolean },
+  ): Promise<void>;
 }
