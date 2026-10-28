@@ -38,6 +38,11 @@ function seiReply(reply: any, err: unknown) {
   throw err;
 }
 
+/** Unidade SEI padrão da seção do usuário autenticado. */
+function unidadeDaSecao(request: { user?: { seiUnidade?: { idUnidade: string } | null } }) {
+  return request.user?.seiUnidade?.idUnidade;
+}
+
 /**
  * Rotas live alinhadas ao gateway segov/sei.
  * Prefixo /sei para não colidir com o acompanhamento em /processos.
@@ -135,7 +140,7 @@ export async function seiGatewayRoutes(app: FastifyInstance) {
       try {
         const q = consultarProcessoLiveQuerySchema.parse(request.query);
         const dado = await seiGateway.consultarProcedimento(q.protocolo, {
-          idUnidade: q.idUnidade,
+          idUnidade: q.idUnidade ?? unidadeDaSecao(request),
           interessados: q.interessados,
           assuntos: q.assuntos,
           observacoes: q.observacoes,
@@ -178,7 +183,7 @@ export async function seiGatewayRoutes(app: FastifyInstance) {
       try {
         const q = andamentosLiveQuerySchema.parse(request.query);
         const dados = await seiGateway.listarAndamentos(q.protocolo, {
-          idUnidade: q.idUnidade,
+          idUnidade: q.idUnidade ?? unidadeDaSecao(request),
           atributos: q.atributos,
         });
         return reply.send({ dados });
@@ -235,7 +240,7 @@ export async function seiGatewayRoutes(app: FastifyInstance) {
             assuntos: body.assuntos,
           },
           {
-            idUnidade: body.idUnidade,
+            idUnidade: body.idUnidade ?? unidadeDaSecao(request),
             unidadesEnvio: body.unidadesEnvio,
             manterAbertoNaOrigem: body.manterAbertoNaOrigem,
           },
@@ -285,7 +290,7 @@ export async function seiGatewayRoutes(app: FastifyInstance) {
       try {
         const body = enviarProcessoBodySchema.parse(request.body);
         await seiGateway.enviarProcesso(body.protocolo, body.unidadesDestino, {
-          idUnidadeOrigem: body.idUnidadeOrigem,
+          idUnidadeOrigem: body.idUnidadeOrigem ?? unidadeDaSecao(request),
           manterAbertoNaOrigem: body.manterAbertoNaOrigem,
         });
         return reply.send({ ok: true });

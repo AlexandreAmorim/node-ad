@@ -96,10 +96,28 @@ export async function seiRoutes(app: FastifyInstance) {
     async (request, reply) => {
       try {
         const q = listarProcessosQuerySchema.parse(request.query);
+        const user = request.user as {
+          papeis?: string[];
+          seiUnidade?: { idUnidade: string; sigla: string } | null;
+        };
+        const admin = user.papeis?.includes('admin');
+        const todasSecoes = q.todasSecoes === 'true' && admin;
+
+        // Por padrão, restringe à unidade SEI da seção do usuário.
+        // Sem mapeamento OU↔SEI (e sem override admin), não lista nada.
+        if (!todasSecoes && !q.idUnidade && !user.seiUnidade?.idUnidade) {
+          return reply.send({ dados: [] });
+        }
+
+        const idUnidade =
+          q.idUnidade ??
+          (todasSecoes ? undefined : user.seiUnidade?.idUnidade);
+
         const lista = await processosRepo.listar({
           ativo: q.ativo === undefined ? undefined : q.ativo === 'true',
           concluido: q.concluido === undefined ? undefined : q.concluido === 'true',
           busca: q.busca,
+          idUnidade,
           limite: q.limite,
           offset: q.offset,
         });

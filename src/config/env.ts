@@ -36,6 +36,10 @@ const envSchema = z.object({
   SIPOL_PASSWORD: z.string(),
   SIPOL_URL: z.string(),
 
+  SEGOV_USER: z.string(),
+	SEGOV_PASSWORD: z.string(),
+	SEGOV_URL: z.string(),
+
   DETRAN_URL_SET: z.string(),
   DETRAN_URL_GET: z.string(),
   DETRAN_CNPJ: z.string(),

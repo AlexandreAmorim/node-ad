@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { SipolService } from '../lib/sipol';
 import { z } from 'zod'
+import { bearerSecurity } from '../openapi/components';
 import { zodToSchema } from '../openapi/zod-to-schema';
 
 const sipolPersonBodySchema = z.object({
@@ -13,12 +14,14 @@ const sipolPersonBodySchema = z.object({
 })
 
 type SipolPersonBodySchema = z.infer<typeof sipolPersonBodySchema>
- 
+
 export async function sipolRoutes(app: FastifyInstance) {
  app.post('/sipol/person', {
+    preHandler: [app.authenticate],
     schema: {
       tags: ['Sipol'],
       summary: 'Consultar pessoa no Sipol',
+      security: [...bearerSecurity],
       body: zodToSchema(sipolPersonBodySchema),
       response: {
         200: {
@@ -28,6 +31,7 @@ export async function sipolRoutes(app: FastifyInstance) {
             person: {},
           },
         },
+        401: { $ref: 'ErrorAuth#' },
         404: {
           type: 'object',
           properties: {

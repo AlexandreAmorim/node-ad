@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { DetranService } from '../lib/detran';
 import { z } from 'zod'
 import { XMLParser } from 'fast-xml-parser';
+import { bearerSecurity } from '../openapi/components';
 import { zodToSchema } from '../openapi/zod-to-schema';
 
 const detranPersonBodySchema = z.object({
@@ -14,12 +15,14 @@ const detranPersonBodySchema = z.object({
 })
 
 type DetranPersonBodySchema = z.infer<typeof detranPersonBodySchema>
- 
+
 export async function detranRoutes(app: FastifyInstance) {
  app.post('/detran/person', {
+    preHandler: [app.authenticate],
     schema: {
       tags: ['Detran'],
       summary: 'Consultar pessoa no Detran',
+      security: [...bearerSecurity],
       body: zodToSchema(detranPersonBodySchema),
       response: {
         200: {
@@ -29,6 +32,7 @@ export async function detranRoutes(app: FastifyInstance) {
             dados: {},
           },
         },
+        401: { $ref: 'ErrorAuth#' },
         404: {
           type: 'object',
           properties: {

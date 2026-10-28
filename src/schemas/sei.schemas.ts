@@ -5,6 +5,10 @@ export const listarProcessosQuerySchema = z.object({
   ativo: z.enum(['true', 'false']).optional(),
   concluido: z.enum(['true', 'false']).optional(),
   busca: z.string().optional(),
+  /** Filtra processos cuja unidade aberta contém este IdUnidade SEI. */
+  idUnidade: z.string().optional(),
+  /** Se true, ignora o filtro automático pela seção do usuário (só admin). */
+  todasSecoes: z.enum(['true', 'false']).optional(),
   limite: z.coerce.number().int().min(1).max(500).default(100),
   offset: z.coerce.number().int().min(0).default(0),
 });

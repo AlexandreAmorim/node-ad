@@ -40,6 +40,18 @@ export const authUserSchema = {
     displayName: { type: 'string' },
     email: { type: 'string' },
     dn: { type: 'string' },
+    secao: { type: 'string', nullable: true },
+    secaoId: { type: 'string', nullable: true },
+    ouPath: { type: 'string', nullable: true },
+    seiUnidade: {
+      type: 'object',
+      nullable: true,
+      properties: {
+        idUnidade: { type: 'string' },
+        sigla: { type: 'string' },
+      },
+    },
+    papeis: { type: 'array', items: { type: 'string' } },
   },
   required: ['username', 'displayName', 'email', 'dn'],
 };

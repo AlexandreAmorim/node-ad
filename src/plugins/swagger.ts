@@ -26,14 +26,18 @@ export async function registerSwagger(app: FastifyInstance) {
     openapi: {
       openapi: '3.0.3',
       info: {
-        title: 'AD Password / SEI API',
+        title: 'Portal SEGOV API',
         description:
-          'API de autenticação Active Directory, consulta Detran/Sipol e acompanhamento de processos SEI.',
-        version: '1.0.0',
+          'Portal único: autenticação AD, helpdesk (chamados), SEI multi-seção, consultas Detran/Sipol e fleets SEGOV.',
+        version: '2.0.0',
       },
       tags: [
         { name: 'Health', description: 'Health check' },
         { name: 'Auth', description: 'Autenticação e gestão de senhas (AD)' },
+        { name: 'Chamados', description: 'Helpdesk / chamados' },
+        { name: 'Ativos', description: 'CMDB / inventário de ativos (estilo GLPI)' },
+        { name: 'Uploads', description: 'Upload de imagens (máx. 20 MB) para descrição de chamados' },
+        { name: 'Seções', description: 'Mapeamento OU AD ↔ unidade SEI' },
         { name: 'SEI', description: 'Acompanhamento de processos SEI (persistido)' },
         {
           name: 'SEI Gateway',
@@ -42,6 +46,11 @@ export async function registerSwagger(app: FastifyInstance) {
         },
         { name: 'Detran', description: 'Consulta Detran' },
         { name: 'Sipol', description: 'Consulta Sipol' },
+        {
+          name: 'Segov',
+          description:
+            'Proxy para o backend SEGOV (auth de serviço + listagem de viaturas/fleets por lotação)',
+        },
       ],
       components: {
         securitySchemes: {

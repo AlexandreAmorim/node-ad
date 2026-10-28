@@ -128,6 +128,7 @@ export const processosRepo = {
     ativo?: boolean;
     concluido?: boolean;
     busca?: string;
+    idUnidade?: string;
     limite?: number;
     offset?: number;
   } = {}): Promise<Processo[]> {
@@ -143,6 +144,24 @@ export const processosRepo = {
         { rotulo: { contains: filtros.busca, mode: 'insensitive' } },
         ...(digitos ? [{ protocoloDigitos: { contains: digitos } }] : []),
       ];
+    }
+
+    // Filtro por unidade SEI aberta (JSONB). Usa path string para casar idUnidade.
+    if (filtros.idUnidade) {
+      const id = filtros.idUnidade;
+      const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
+        `select id from processo
+          where unidades_abertas::text like $1
+             or unidades_abertas::text like $2
+          limit $3 offset $4`,
+        `%"idUnidade":"${id}"%`,
+        `%"idUnidade": "${id}"%`,
+        (filtros.limite ?? 100) * 5,
+        0,
+      );
+      const ids = rows.map((r) => r.id);
+      if (!ids.length) return [];
+      where.id = { in: ids };
     }
 
     const lista = await prisma.processo.findMany({

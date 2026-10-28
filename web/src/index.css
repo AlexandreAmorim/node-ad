@@ -50,3 +50,55 @@
     }
   }
 }
+
+/* Editor TipTap / descrição HTML de chamados */
+.prose-chamado {
+  word-break: break-word;
+}
+
+.prose-chamado p {
+  margin: 0.4em 0;
+}
+
+.prose-chamado h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0.75em 0 0.35em;
+}
+
+.prose-chamado ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.4em 0;
+}
+
+.prose-chamado ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin: 0.4em 0;
+}
+
+.prose-chamado img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+  margin: 0.5rem 0;
+}
+
+.prose-chamado a {
+  text-decoration: underline;
+  color: var(--color-ink);
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: var(--color-muted);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror:focus {
+  outline: none;
+}

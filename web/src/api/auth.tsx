@@ -8,35 +8,46 @@ import {
 } from 'react'
 
 import { apiFetch, ApiError, EVENTO_NAO_AUTORIZADO, tokenStore } from './client'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
+export interface SeiUnidadeSessao {
+  idUnidade: string
+  sigla: string
+}
 
 export interface UsuarioSessao {
   username: string
   displayName: string
   email: string | null
   dn: string
+  secao?: string | null
+  secaoId?: string | null
+  ouPath?: string | null
+  seiUnidade?: SeiUnidadeSessao | null
+  papeis?: string[]
 }
 
 interface RespostaLogin {
   success: boolean
   token: string
-  user: {
-    username: string
-    displayName: string
-    email: string | null
-    dn: string
-  }
+  user: UsuarioSessao
 }
 
 interface ContextoAuth {
   usuario: UsuarioSessao | null
   autenticado: boolean
+  ehAdmin: boolean
+  ehAtendente: boolean
   entrar: (username: string, password: string) => Promise<void>
   sair: () => void
 }
 
 const AuthContext = createContext<ContextoAuth | null>(null)
 
-const CHAVE_USUARIO = 'painel-corregedoria:usuario'
+const CHAVE_USUARIO = 'portal-segov:usuario'
 
 function lerUsuarioSalvo(): UsuarioSessao | null {
   const bruto = sessionStorage.getItem(CHAVE_USUARIO)
@@ -57,8 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(null)
   }, [])
 
-  // O token do AD expira em 8h; quando a API devolve 401 o client emite este
-  // evento e a sessão cai aqui, em vez de o usuário ver telas vazias.
   useEffect(() => {
     window.addEventListener(EVENTO_NAO_AUTORIZADO, sair)
     return () => window.removeEventListener(EVENTO_NAO_AUTORIZADO, sair)
@@ -76,8 +85,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(resposta.user)
   }, [])
 
+  const papeis = usuario?.papeis ?? []
+
   return (
-    <AuthContext value={{ usuario, autenticado: Boolean(usuario), entrar, sair }}>
+    <AuthContext
+      value={{
+        usuario,
+        autenticado: Boolean(usuario),
+        ehAdmin: papeis.includes('admin'),
+        ehAtendente: papeis.includes('atendente') || papeis.includes('admin'),
+        entrar,
+        sair,
+      }}
+    >
       {children}
     </AuthContext>
   )
@@ -88,10 +108,6 @@ export function useAuth(): ContextoAuth {
   if (!ctx) throw new Error('useAuth precisa estar dentro de <AuthProvider>')
   return ctx
 }
-
-// ---------------------------------------------------------------------------
-// Tela de login
-// ---------------------------------------------------------------------------
 
 export function TelaLogin() {
   const { entrar } = useAuth()
@@ -118,58 +134,63 @@ export function TelaLogin() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-ink px-6">
-      <div className="w-full max-w-sm rounded-lg border border-line bg-card p-7">
-        <div className="font-mono text-[10.5px] tracking-[0.18em] text-muted uppercase">
-          Secretaria de Governo · Rio de Janeiro
-        </div>
-        <h1 className="mt-1 mb-6 font-display text-xl font-extrabold text-ink">
-          Painel de Gestão
-        </h1>
-
-        <label className="mb-1 block text-xs font-semibold text-ink-soft" htmlFor="usuario">
-          Usuário de rede
-        </label>
-        <input
-          id="usuario"
-          value={username}
-          autoComplete="username"
-          onChange={(e) => setUsername(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && enviar()}
-          className="mb-4 w-full rounded-md border border-line bg-paper px-3 py-2 font-mono text-sm text-ink"
-        />
-
-        <label className="mb-1 block text-xs font-semibold text-ink-soft" htmlFor="senha">
-          Senha
-        </label>
-        <input
-          id="senha"
-          type="password"
-          value={password}
-          autoComplete="current-password"
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && enviar()}
-          className="w-full rounded-md border border-line bg-paper px-3 py-2 font-mono text-sm text-ink"
-        />
-
-        {erro && (
-          <p className="mt-4 rounded-md border border-danger/35 bg-danger/6 px-3 py-2 text-[12.5px] text-danger">
-            {erro}
+      <Card className="w-full max-w-sm border-line/40">
+        <CardHeader>
+          <p className="font-mono text-[10.5px] tracking-[0.18em] text-muted uppercase">
+            Secretaria de Governo · Rio de Janeiro
           </p>
-        )}
+          <CardTitle>Portal SEGOV</CardTitle>
+          <CardDescription>
+            Helpdesk, SEI por seção e consultas institucionais
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="usuario">Usuário de rede</Label>
+              <Input
+                id="usuario"
+                value={username}
+                autoComplete="username"
+                onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && enviar()}
+                className="font-mono"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="senha">Senha</Label>
+              <Input
+                id="senha"
+                type="password"
+                value={password}
+                autoComplete="current-password"
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && enviar()}
+                className="font-mono"
+              />
+            </div>
 
-        <button
-          type="button"
-          onClick={enviar}
-          disabled={enviando || !username || !password}
-          className="mt-5 w-full cursor-pointer rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {enviando ? 'Entrando…' : 'Entrar'}
-        </button>
+            {erro && (
+              <p className="rounded-md border border-danger/35 bg-danger/6 px-3 py-2 text-[12.5px] text-danger">
+                {erro}
+              </p>
+            )}
 
-        <p className="mt-4 text-[11.5px] leading-relaxed text-muted">
-          Autenticação pelo Active Directory. A sessão expira em 8 horas.
-        </p>
-      </div>
+            <Button
+              type="button"
+              onClick={enviar}
+              disabled={enviando || !username || !password}
+              className="w-full"
+            >
+              {enviando ? 'Entrando…' : 'Entrar'}
+            </Button>
+
+            <p className="text-[11.5px] leading-relaxed text-muted">
+              Autenticação pelo Active Directory. A seção SEI é resolvida pela OU do seu DN.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

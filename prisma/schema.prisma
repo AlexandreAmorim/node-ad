@@ -11,6 +11,8 @@ model Setting {
   id           Int       @id @default(autoincrement())
   sipol_status Boolean?  @default(true)
   sipol_token  String?
+  segov_status Boolean?  @default(true)
+  segov_token  String?
   created_at   DateTime? @default(now())
   updated_at   DateTime? @default(now())
 
@@ -164,4 +166,294 @@ model SeiTipoProcedimento {
   atualizadoEm       DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz(6)
 
   @@map("sei_tipo_procedimento")
+}
+
+// -----------------------------------------------------------------------------
+// Mapeamento OU do AD ↔ unidade SEI (seção)
+// -----------------------------------------------------------------------------
+
+model SecaoAdMap {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ouCodigo     String   @unique @map("ou_codigo")
+  nome         String
+  seiIdUnidade String?  @map("sei_id_unidade")
+  seiSigla     String?  @map("sei_sigla")
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  atualizadoEm DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz(6)
+
+  chamados Chamado[]
+
+  @@map("secao_ad_map")
+}
+
+// -----------------------------------------------------------------------------
+// Helpdesk — chamados
+// -----------------------------------------------------------------------------
+
+enum ChamadoStatus {
+  novo
+  em_atendimento
+  aguardando_solicitante
+  resolvido
+  fechado
+  cancelado
+
+  @@map("chamado_status")
+}
+
+enum ChamadoPrioridade {
+  baixa
+  media
+  alta
+  urgente
+
+  @@map("chamado_prioridade")
+}
+
+model Categoria {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome      String
+  descricao String?
+  parentId  String?     @map("parent_id") @db.Uuid
+  parent    Categoria?  @relation("CategoriaArvore", fields: [parentId], references: [id])
+  filhos    Categoria[] @relation("CategoriaArvore")
+  ativo     Boolean     @default(true)
+  criadoEm  DateTime    @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  chamados Chamado[]
+
+  @@map("categoria")
+}
+
+model Chamado {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  numero Int    @unique @default(autoincrement())
+
+  titulo     String
+  descricao  String
+  status     ChamadoStatus     @default(novo)
+  prioridade ChamadoPrioridade @default(media)
+
+  solicitanteUsername String  @map("solicitante_username")
+  solicitanteNome     String? @map("solicitante_nome")
+  atendenteUsername   String? @map("atendente_username")
+  atendenteNome       String? @map("atendente_nome")
+
+  secaoId  String?     @map("secao_id") @db.Uuid
+  secao    SecaoAdMap? @relation(fields: [secaoId], references: [id])
+  ouCodigo String?     @map("ou_codigo")
+
+  categoriaId String?    @map("categoria_id") @db.Uuid
+  categoria   Categoria? @relation(fields: [categoriaId], references: [id])
+
+  prazoRespostaEm DateTime? @map("prazo_resposta_em") @db.Timestamptz(6)
+  prazoSolucaoEm  DateTime? @map("prazo_solucao_em") @db.Timestamptz(6)
+  resolvidoEm     DateTime? @map("resolvido_em") @db.Timestamptz(6)
+  fechadoEm       DateTime? @map("fechado_em") @db.Timestamptz(6)
+
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  atualizadoEm DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz(6)
+
+  comentarios ChamadoComentario[]
+  historico   ChamadoHistorico[]
+  ativos      ChamadoAtivo[]
+
+  @@index([solicitanteUsername], map: "chamado_solicitante_idx")
+  @@index([atendenteUsername], map: "chamado_atendente_idx")
+  @@index([status], map: "chamado_status_idx")
+  @@index([ouCodigo], map: "chamado_ou_idx")
+  @@map("chamado")
+}
+
+model ChamadoComentario {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chamadoId String  @map("chamado_id") @db.Uuid
+  chamado   Chamado @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+
+  autorUsername String  @map("autor_username")
+  autorNome     String? @map("autor_nome")
+  texto         String
+  interno       Boolean @default(false)
+
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  @@index([chamadoId, criadoEm], map: "chamado_comentario_idx")
+  @@map("chamado_comentario")
+}
+
+model ChamadoHistorico {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chamadoId String  @map("chamado_id") @db.Uuid
+  chamado   Chamado @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+
+  autorUsername String  @map("autor_username")
+  campo         String
+  valorAnterior String? @map("valor_anterior")
+  valorNovo     String? @map("valor_novo")
+
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  @@index([chamadoId, criadoEm], map: "chamado_historico_idx")
+  @@map("chamado_historico")
+}
+
+// -----------------------------------------------------------------------------
+// CMDB / Inventário de ativos (estilo GLPI)
+// -----------------------------------------------------------------------------
+
+enum AtivoTipo {
+  computador
+  monitor
+  impressora
+  rede
+  telefone
+  periferico
+  software
+  outro
+
+  @@map("ativo_tipo")
+}
+
+enum AtivoStatus {
+  em_estoque
+  em_uso
+  em_manutencao
+  reservado
+  descartado
+
+  @@map("ativo_status")
+}
+
+model Fabricante {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome     String   @unique
+  site     String?
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  modelos ModeloAtivo[]
+  ativos  Ativo[]
+
+  @@map("fabricante")
+}
+
+model ModeloAtivo {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome         String
+  tipo         AtivoTipo   @default(computador)
+  fabricanteId String?     @map("fabricante_id") @db.Uuid
+  fabricante   Fabricante? @relation(fields: [fabricanteId], references: [id])
+  ativo        Boolean     @default(true)
+  criadoEm     DateTime    @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  ativos Ativo[]
+
+  @@unique([fabricanteId, nome, tipo])
+  @@map("modelo_ativo")
+}
+
+model Localizacao {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome       String
+  codigo     String?       @unique
+  parentId   String?       @map("parent_id") @db.Uuid
+  parent     Localizacao?  @relation("LocalArvore", fields: [parentId], references: [id])
+  filhos     Localizacao[] @relation("LocalArvore")
+  endereco   String?
+  ativo      Boolean       @default(true)
+  criadoEm   DateTime      @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  ativos Ativo[]
+
+  @@map("localizacao")
+}
+
+model Fornecedor {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome     String   @unique
+  cnpj     String?
+  contato  String?
+  email    String?
+  telefone String?
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  ativos Ativo[]
+
+  @@map("fornecedor")
+}
+
+model Ativo {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  numero Int    @unique @default(autoincrement())
+
+  nome            String
+  tipo            AtivoTipo   @default(computador)
+  status          AtivoStatus @default(em_estoque)
+  numeroSerie     String?     @map("numero_serie")
+  numeroPatrimonio String?    @unique @map("numero_patrimonio")
+  numeroInventario String?    @map("numero_inventario")
+
+  fabricanteId String?     @map("fabricante_id") @db.Uuid
+  fabricante   Fabricante? @relation(fields: [fabricanteId], references: [id])
+  modeloId     String?     @map("modelo_id") @db.Uuid
+  modelo       ModeloAtivo? @relation(fields: [modeloId], references: [id])
+  localizacaoId String?    @map("localizacao_id") @db.Uuid
+  localizacao  Localizacao? @relation(fields: [localizacaoId], references: [id])
+  fornecedorId String?     @map("fornecedor_id") @db.Uuid
+  fornecedor   Fornecedor? @relation(fields: [fornecedorId], references: [id])
+
+  /** Usuário AD responsável / em uso */
+  usuarioUsername String? @map("usuario_username")
+  usuarioNome     String? @map("usuario_nome")
+  ouCodigo        String? @map("ou_codigo")
+
+  dataAquisicao DateTime? @map("data_aquisicao") @db.Date
+  dataGarantia  DateTime? @map("data_garantia") @db.Date
+  valor         Decimal?  @db.Decimal(12, 2)
+  observacao    String?
+
+  /** Campos técnicos opcionais (CPU, RAM, IP, MAC…) */
+  specs Json @default("{}") @db.JsonB
+
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+  atualizadoEm DateTime @default(now()) @updatedAt @map("atualizado_em") @db.Timestamptz(6)
+
+  historico AtivoHistorico[]
+  chamados  ChamadoAtivo[]
+
+  @@index([tipo], map: "ativo_tipo_idx")
+  @@index([status], map: "ativo_status_idx")
+  @@index([usuarioUsername], map: "ativo_usuario_idx")
+  @@index([ouCodigo], map: "ativo_ou_idx")
+  @@index([numeroSerie], map: "ativo_serie_idx")
+  @@map("ativo")
+}
+
+model AtivoHistorico {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ativoId String @map("ativo_id") @db.Uuid
+  ativo   Ativo  @relation(fields: [ativoId], references: [id], onDelete: Cascade)
+
+  autorUsername String  @map("autor_username")
+  campo         String
+  valorAnterior String? @map("valor_anterior")
+  valorNovo     String? @map("valor_novo")
+  criadoEm      DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  @@index([ativoId, criadoEm], map: "ativo_historico_idx")
+  @@map("ativo_historico")
+}
+
+/** Vínculo N:N chamado ↔ ativo (como no GLPI). */
+model ChamadoAtivo {
+  chamadoId String  @map("chamado_id") @db.Uuid
+  ativoId   String  @map("ativo_id") @db.Uuid
+  chamado   Chamado @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+  ativo     Ativo   @relation(fields: [ativoId], references: [id], onDelete: Cascade)
+  criadoEm  DateTime @default(now()) @map("criado_em") @db.Timestamptz(6)
+
+  @@id([chamadoId, ativoId])
+  @@map("chamado_ativo")
 }

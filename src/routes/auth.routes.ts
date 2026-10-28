@@ -7,6 +7,7 @@ import {
 } from '../schemas/auth.schemas';
 import { bearerSecurity } from '../openapi/components';
 import { zodToSchema } from '../openapi/zod-to-schema';
+import { resolverContextoUsuario } from '../service/secoes';
 
 export async function authRoutes(app: FastifyInstance) {
 
@@ -42,14 +43,28 @@ export async function authRoutes(app: FastifyInstance) {
 
       // Busca informações do usuário
       const user = await ActiveDirectoryService.findUser(username);
-      
-      // Gera token JWT
+
+      console.log('user', user);
+      const ctx = await resolverContextoUsuario({
+        dn: user.dn,
+        memberOf: user.memberOf,
+      });
+
+      const sAMAccountName = user.sAMAccountName ?? username.split('@')[0];
+
+      // Gera token JWT enriquecido com seção / SEI / papéis
       const token = app.jwt.sign(
         { 
-          username,
+          username: sAMAccountName,
           dn: user.dn,
           displayName: user.displayName,
-          mail: user.mail 
+          mail: user.mail,
+          memberOf: user.memberOf,
+          secao: ctx.secao,
+          secaoId: ctx.secaoId,
+          ouPath: ctx.ouPath,
+          seiUnidade: ctx.seiUnidade,
+          papeis: ctx.papeis,
         },
         { expiresIn: '8h' }
       );
@@ -58,10 +73,15 @@ export async function authRoutes(app: FastifyInstance) {
         success: true,
         token,
         user: {
-          username: user.sAMAccountName,
+          username: sAMAccountName,
           displayName: user.displayName,
           email: user.mail,
-          dn: user.dn
+          dn: user.dn,
+          secao: ctx.secao,
+          secaoId: ctx.secaoId,
+          ouPath: ctx.ouPath,
+          seiUnidade: ctx.seiUnidade,
+          papeis: ctx.papeis,
         }
       });
     } catch (error: any) {
@@ -189,7 +209,7 @@ export async function authRoutes(app: FastifyInstance) {
       const { username } = request.params as { username: string };
       
       const user = await ActiveDirectoryService.findUser(username);
-
+console.log('user me', user);
       return reply.send({
         success: true,
         user: {

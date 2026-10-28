@@ -79,6 +79,8 @@ export interface FiltrosProcessos {
   concluido?: boolean
   busca?: string
   limite?: number
+  idUnidade?: string
+  todasSecoes?: string
 }
 
 function querystring(filtros: FiltrosProcessos): string {
@@ -87,6 +89,8 @@ function querystring(filtros: FiltrosProcessos): string {
   if (filtros.concluido !== undefined) p.set('concluido', String(filtros.concluido))
   if (filtros.busca) p.set('busca', filtros.busca)
   if (filtros.limite) p.set('limite', String(filtros.limite))
+  if (filtros.idUnidade) p.set('idUnidade', filtros.idUnidade)
+  if (filtros.todasSecoes) p.set('todasSecoes', filtros.todasSecoes)
   const s = p.toString()
   return s ? `?${s}` : ''
 }
