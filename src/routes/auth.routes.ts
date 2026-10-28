@@ -44,7 +44,6 @@ export async function authRoutes(app: FastifyInstance) {
       // Busca informações do usuário
       const user = await ActiveDirectoryService.findUser(username);
 
-      console.log('user', user);
       const ctx = await resolverContextoUsuario({
         dn: user.dn,
         memberOf: user.memberOf,
@@ -60,6 +59,7 @@ export async function authRoutes(app: FastifyInstance) {
           displayName: user.displayName,
           mail: user.mail,
           memberOf: user.memberOf,
+          description: user.description,
           secao: ctx.secao,
           secaoId: ctx.secaoId,
           ouPath: ctx.ouPath,
@@ -209,7 +209,7 @@ export async function authRoutes(app: FastifyInstance) {
       const { username } = request.params as { username: string };
       
       const user = await ActiveDirectoryService.findUser(username);
-console.log('user me', user);
+
       return reply.send({
         success: true,
         user: {

@@ -35,6 +35,7 @@ declare module '@fastify/jwt' {
       displayName?: string;
       mail?: string;
       memberOf?: string | string[];
+      description?: string;
       secao?: string | null;
       secaoId?: string | null;
       ouPath?: string;
@@ -47,6 +48,7 @@ declare module '@fastify/jwt' {
       displayName?: string;
       mail?: string;
       memberOf?: string | string[];
+      description?: string;
       secao?: string | null;
       secaoId?: string | null;
       ouPath?: string;
