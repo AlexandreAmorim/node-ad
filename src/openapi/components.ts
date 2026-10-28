@@ -39,6 +39,7 @@ export const authUserSchema = {
     username: { type: 'string' },
     displayName: { type: 'string' },
     email: { type: 'string' },
+    description: { type: 'string', nullable: true },
     dn: { type: 'string' },
     secao: { type: 'string', nullable: true },
     secaoId: { type: 'string', nullable: true },
